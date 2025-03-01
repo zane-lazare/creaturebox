@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CreatureBox Control Panel</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1><i class="fas fa-bug"></i> CreatureBox Control Panel</h1>
+                <span class="version">v1.0</span>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="#" class="active" data-page="dashboard"><i class="fas fa-home"></i> Dashboard</a></li>
+                    <li><a href="#" data-page="camera"><i class="fas fa-camera"></i> Camera</a></li>
+                    <li><a href="#" data-page="settings"><i class="fas fa-cog"></i> Settings</a></li>
+                    <li><a href="#" data-page="gallery"><i class="fas fa-images"></i> Gallery</a></li>
+                    <li><a href="#" data-page="logs"><i class="fas fa-list"></i> Logs</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Dashboard Page -->
+            <section id="dashboard" class="page active">
+                <div class="dashboard-header">
+                    <h2>System Status</h2>
+                    <div class="status-indicator online">
+                        <span class="dot"></span>
+                        <span class="text">System Online</span>
+                    </div>
+                </div>
+
+                <div class="cards-container">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-microchip"></i>
+                            <h3>System</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">Device Name:</span>
+                                <span class="value" id="device-name">Loading...</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Uptime:</span>
+                                <span class="value" id="uptime">Loading...</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">CPU Temp:</span>
+                                <span class="value" id="cpu-temp">Loading...</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">CPU Usage:</span>
+                                <span class="value" id="cpu-usage">Loading...</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Memory:</span>
+                                <span class="value" id="memory-usage">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-battery-half"></i>
+                            <h3>Power</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">Power Source:</span>
+                                <span class="value" id="power-source">Loading...</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Battery Level:</span>
+                                <div class="progress-bar">
+                                    <div id="battery-level" class="progress" style="width: 0%"></div>
+                                </div>
+                                <span id="battery-percentage">0%</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Current:</span>
+                                <span class="value" id="power-current">Loading...</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Voltage:</span>
+                                <span class="value" id="power-voltage">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-hdd"></i>
+                            <h3>Storage</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">Internal:</span>
+                                <div class="progress-bar">
+                                    <div id="storage-internal" class="progress" style="width: 0%"></div>
+                                </div>
+                                <span id="storage-internal-text">0%</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Photos:</span>
+                                <span class="value" id="photos-count">Loading...</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">External:</span>
+                                <div class="progress-bar">
+                                    <div id="storage-external" class="progress" style="width: 0%"></div>
+                                </div>
+                                <span id="storage-external-text">Not connected</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card wide">
+                        <div class="card-header">
+                            <i class="fas fa-calendar-alt"></i>
+                            <h3>Schedule</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">Current Mode:</span>
+                                <span class="value" id="current-mode">Loading...</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Next Wake:</span>
+                                <span class="value" id="next-wake">Loading...</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Last Photo:</span>
+                                <span class="value" id="last-photo">Loading...</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Runtime:</span>
+                                <span class="value" id="runtime">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="btn-take-photo" class="btn primary"><i class="fas fa-camera"></i> Take Photo</button>
+                    <button id="btn-toggle-lights" class="btn secondary"><i class="fas fa-lightbulb"></i> Toggle Lights</button>
+                    <button id="btn-reboot" class="btn danger"><i class="fas fa-sync"></i> Reboot</button>
+                    <button id="btn-shutdown" class="btn danger"><i class="fas fa-power-off"></i> Shutdown</button>
+                </div>
+            </section>
+
+            <!-- Camera Page -->
+            <section id="camera" class="page">
+                <h2>Camera Control</h2>
+                
+                <div class="camera-container">
+                    <div class="camera-feed">
+                        <img id="camera-stream" src="img/camera-placeholder.jpg" alt="Camera Feed">
+                        <div class="camera-overlay">
+                            <button id="btn-stream-start" class="btn primary"><i class="fas fa-play"></i> Start Stream</button>
+                        </div>
+                    </div>
+                    
+                    <div class="camera-controls">
+                        <div class="control-group">
+                            <h3>Image Settings</h3>
+                            <div class="control-row">
+                                <label for="image-format">Format:</label>
+                                <select id="image-format">
+                                    <option value="0">JPEG</option>
+                                    <option value="1">PNG</option>
+                                    <option value="2">BMP</option>
+                                </select>
+                            </div>
+                            <div class="control-row">
+                                <label for="exposure-time">Exposure (μs):</label>
+                                <input type="range" id="exposure-time" min="100" max="10000" value="500">
+                                <span id="exposure-time-value">500</span>
+                            </div>
+                            <div class="control-row">
+                                <label for="analog-gain">Gain:</label>
+                                <input type="range" id="analog-gain" min="1" max="16" step="0.1" value="1.5">
+                                <span id="analog-gain-value">1.5</span>
+                            </div>
+                            <div class="control-row">
+                                <label for="lens-position">Focus:</label>
+                                <input type="range" id="lens-position" min="0" max="10" step="0.1" value="6.0">
+                                <span id="lens-position-value">6.0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <h3>HDR Settings</h3>
+                            <div class="control-row">
+                                <label for="hdr-toggle">Enable HDR:</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="hdr-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                            <div class="control-row hdr-setting">
+                                <label for="hdr-photos">Number of Photos:</label>
+                                <input type="number" id="hdr-photos" min="3" max="9" value="3">
+                            </div>
+                            <div class="control-row hdr-setting">
+                                <label for="hdr-width">Exposure Width:</label>
+                                <input type="number" id="hdr-width" min="1000" max="20000" step="1000" value="7000">
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <h3>Actions</h3>
+                            <div class="control-buttons">
+                                <button id="btn-calibrate" class="btn secondary"><i class="fas fa-sync"></i> Calibrate</button>
+                                <button id="btn-capture" class="btn primary"><i class="fas fa-camera"></i> Capture</button>
+                                <button id="btn-save-settings" class="btn success"><i class="fas fa-save"></i> Save Settings</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Page -->
+            <section id="settings" class="page">
+                <h2>System Settings</h2>
+                
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="schedule-tab">Schedule</button>
+                    <button class="tab-btn" data-tab="network-tab">Network</button>
+                    <button class="tab-btn" data-tab="camera-tab">Camera</button>
+                    <button class="tab-btn" data-tab="power-tab">Power</button>
+                </div>
+                
+                <div id="schedule-tab" class="tab-content active">
+                    <h3>Schedule Settings</h3>
+                    
+                    <form id="schedule-form">
+                        <div class="form-group">
+                            <label>Active Days:</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" name="weekday" value="1"> Monday</label>
+                                <label><input type="checkbox" name="weekday" value="2"> Tuesday</label>
+                                <label><input type="checkbox" name="weekday" value="3"> Wednesday</label>
+                                <label><input type="checkbox" name="weekday" value="4"> Thursday</label>
+                                <label><input type="checkbox" name="weekday" value="5"> Friday</label>
+                                <label><input type="checkbox" name="weekday" value="6"> Saturday</label>
+                                <label><input type="checkbox" name="weekday" value="7"> Sunday</label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Active Hours:</label>
+                            <div class="hours-selector">
+                                <div class="hours-grid">
+                                    <!-- JavaScript will populate this -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="utc-offset">UTC Offset:</label>
+                            <input type="number" id="utc-offset" name="utc_off" min="-12" max="14" value="-5">
+                            <span class="help-text">Your local timezone offset from UTC</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="runtime">Runtime (minutes):</label>
+                            <input type="number" id="runtime" name="runtime" min="0" max="1440" value="60">
+                            <span class="help-text">How long to run before shutdown (0 = no shutdown)</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="only-flash">Attraction Mode:</label>
+                            <select id="only-flash" name="onlyflash">
+                                <option value="0">UV Light Only</option>
+                                <option value="1">UV Light + Flash</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn primary">Save Schedule</button>
+                    </form>
+                </div>
+                
+                <div id="network-tab" class="tab-content">
+                    <h3>Network Settings</h3>
+                    
+                    <div class="network-status">
+                        <h4>Current Connection</h4>
+                        <div class="info-row">
+                            <span class="label">Status:</span>
+                            <span class="value" id="wifi-status">Loading...</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">SSID:</span>
+                            <span class="value" id="wifi-ssid">Loading...</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">IP Address:</span>
+                            <span class="value" id="wifi-ip">Loading...</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Signal:</span>
+                            <span class="value" id="wifi-signal">Loading...</span>
+                        </div>
+                    </div>
+                    
+                    <div class="network-form">
+                        <h4>Add New Network</h4>
+                        <form id="network-form">
+                            <div class="form-group">
+                                <label for="wifi-ssid-input">SSID:</label>
+                                <input type="text" id="wifi-ssid-input" name="ssid" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="wifi-password">Password:</label>
+                                <input type="password" id="wifi-password" name="wifipass" required>
+                            </div>
+                            <button type="submit" class="btn primary">Connect</button>
+                        </form>
+                    </div>
+                </div>
+                
+                <div id="camera-tab" class="tab-content">
+                    <h3>Advanced Camera Settings</h3>
+                    
+                    <form id="camera-settings-form">
+                        <div class="form-group">
+                            <label for="auto-calibration">Auto Calibration:</label>
+                            <label class="switch">
+                                <input type="checkbox" id="auto-calibration" name="AutoCalibration" value="1">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="cal-period">Calibration Period (seconds):</label>
+                            <input type="number" id="cal-period" name="AutoCalibrationPeriod" min="60" max="86400" value="600">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="vertical-flip">Vertical Flip:</label>
+                            <label class="switch">
+                                <input type="checkbox" id="vertical-flip" name="VerticalFlip" value="1">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="awb-mode">White Balance Mode:</label>
+                            <select id="awb-mode" name="AwbMode">
+                                <option value="0">Auto</option>
+                                <option value="1">Incandescent</option>
+                                <option value="2">Tungsten</option>
+                                <option value="3">Fluorescent</option>
+                                <option value="4">Indoor</option>
+                                <option value="5">Daylight</option>
+                                <option value="6">Cloudy</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="focus-mode">Focus Mode:</label>
+                            <select id="focus-mode" name="AfMode">
+                                <option value="0">Manual</option>
+                                <option value="1">Auto</option>
+                                <option value="2">Continuous</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn primary">Save Camera Settings</button>
+                    </form>
+                </div>
+                
+                <div id="power-tab" class="tab-content">
+                    <h3>Power Management</h3>
+                    
+                    <div class="info-row">
+                        <span class="label">Pi Model:</span>
+                        <span class="value" id="pi-model">Loading...</span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="label">Power Manager:</span>
+                        <span class="value" id="power-manager">Loading...</span>
+                    </div>
+                    
+                    <form id="power-settings-form">
+                        <div class="form-group">
+                            <label for="power-off-on-halt">Power Off on Halt:</label>
+                            <label class="switch">
+                                <input type="checkbox" id="power-off-on-halt" name="POWER_OFF_ON_HALT" value="1">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="help-text">Pi 5 only - power off completely when halted</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="wake-on-gpio">Wake on GPIO:</label>
+                            <label class="switch">
+                                <input type="checkbox" id="wake-on-gpio" name="WAKE_ON_GPIO" value="1">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="help-text">Pi 5 only - allow GPIO to wake system</span>
+                        </div>
+                        
+                        <button type="submit" class="btn primary">Save Power Settings</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Gallery Page -->
+            <section id="gallery" class="page">
+                <h2>Photo Gallery</h2>
+                
+                <div class="gallery-controls">
+                    <div class="date-filter">
+                        <label for="date-select">Filter by Date:</label>
+                        <select id="date-select">
+                            <option value="all">All Dates</option>
+                            <!-- Will be populated by JavaScript -->
+                        </select>
+                    </div>
+                    
+                    <div class="view-controls">
+                        <button id="view-grid" class="view-btn active"><i class="fas fa-th"></i></button>
+                        <button id="view-list" class="view-btn"><i class="fas fa-list"></i></button>
+                    </div>
+                </div>
+                
+                <div class="gallery-container grid-view">
+                    <!-- Will be populated by JavaScript -->
+                    <div class="gallery-message">Loading photos...</div>
+                </div>
+                
+                <div class="photo-modal">
+                    <div class="modal-content">
+                        <span class="close-modal">&times;</span>
+                        <img id="modal-image" src="" alt="Full size photo">
+                        <div class="modal-info">
+                            <h3 id="modal-title"></h3>
+                            <div class="info-row">
+                                <span class="label">Date:</span>
+                                <span id="modal-date"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Time:</span>
+                                <span id="modal-time"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Exposure:</span>
+                                <span id="modal-exposure"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Focus:</span>
+                                <span id="modal-focus"></span>
+                            </div>
+                        </div>
+                        <div class="modal-controls">
+                            <button id="btn-prev" class="btn secondary"><i class="fas fa-chevron-left"></i> Previous</button>
+                            <button id="btn-download" class="btn primary"><i class="fas fa-download"></i> Download</button>
+                            <button id="btn-delete" class="btn danger"><i class="fas fa-trash"></i> Delete</button>
+                            <button id="btn-next" class="btn secondary">Next <i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Logs Page -->
+            <section id="logs" class="page">
+                <h2>System Logs</h2>
+                
+                <div class="log-controls">
+                    <div class="log-filter">
+                        <label for="log-type">Log Type:</label>
+                        <select id="log-type">
+                            <option value="system">System Log</option>
+                            <option value="camera">Camera Log</option>
+                            <option value="scheduler">Scheduler Log</option>
+                            <option value="power">Power Log</option>
+                        </select>
+                    </div>
+                    
+                    <div class="log-controls-right">
+                        <button id="btn-refresh-log" class="btn secondary"><i class="fas fa-sync"></i> Refresh</button>
+                        <button id="btn-download-log" class="btn primary"><i class="fas fa-download"></i> Download</button>
+                    </div>
+                </div>
+                
+                <div class="log-container">
+                    <pre id="log-content" class="log-viewer">Loading logs...</pre>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <div class="footer-content">
+                <p>&copy; 2025 CreatureBox | <a href="#" id="about-link">About</a> | <a href="#" id="help-link">Help</a></p>
+                <p class="version-info">CreatureBox v1.0 | <span id="update-status">Up to date</span></p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- About Modal -->
+    <div id="about-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>About CreatureBox</h2>
+            <p>CreatureBox v1.0 - Wildlife Monitoring System</p>
+            <p>Based on the original Mothbox by Digital Naturalism Laboratories</p>
+            <p>All components are open source and freely available to use and modify.</p>
+            <p>Released under the MIT License</p>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>CreatureBox Help</h2>
+            <h3>Quick Start Guide</h3>
+            <ol>
+                <li>Configure your schedule in the Settings tab</li>
+                <li>Adjust camera settings in the Camera tab</li>
+                <li>Test your setup by taking a manual photo</li>
+                <li>View captured images in the Gallery tab</li>
+            </ol>
+            <h3>Troubleshooting</h3>
+            <ul>
+                <li>If photos appear too dark, increase the exposure time or gain</li>
+                <li>If photos are blurry, run calibration or manually adjust focus</li>
+                <li>Check logs for detailed error messages</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+    <script src="js/camera.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/gallery.js"></script>
+    <script src="js/logs.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
