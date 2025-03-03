@@ -12,6 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="${HOME}/CreatureBox"
 LOG_FILE="${TARGET_DIR}/install.log"
 WEB_PORT=5000
+VENV_PATH="${HOME}/creaturebox-venv"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -57,14 +58,25 @@ check_system() {
         fi
     fi
     
+    # Check Python version
+    python_version=$(python3 --version 2>&1 | cut -d ' ' -f 2)
+    log "Detected Python version: $python_version"
+    python_major=$(echo $python_version | cut -d. -f1)
+    python_minor=$(echo $python_version | cut -d. -f2)
+    
+    if [ "$python_major" -lt 3 ] || ([ "$python_major" -eq 3 ] && [ "$python_minor" -lt 7 ]); then
+        error "CreatureBox requires Python 3.7+. Please upgrade your Python installation."
+        exit 1
+    fi
+    
     # Ensure system is up to date
+    log "Updating package lists..."
     sudo apt-get update
-    sudo apt-get upgrade -y
 }
 
-# Install required packages
+# Install required system packages
 install_packages() {
-    log "Installing required packages..."
+    log "Installing required system packages..."
     
     # Update package lists and upgrade
     sudo apt-get update
@@ -96,53 +108,82 @@ install_packages() {
     sudo apt-get install -y \
         network-manager \
         avahi-daemon \
-        nginx \
-        hostapd
+        nginx
     
     # Install additional system utilities
     sudo apt-get install -y \
         rsync \
-        psmisc \
-        vsftpd \
-        samba
+        psmisc
     
-    # Install development and build tools
-    sudo apt-get install -y \
-        build-essential \
-        cmake \
-        pkg-config
+    log "System package installation complete."
+}
+
+# Setup Python virtual environment
+setup_venv() {
+    log "Setting up Python virtual environment..."
     
-    # Python package dependencies
-    log "Installing Python dependencies via pip..."
-    python3 -m pip install --user --upgrade pip setuptools wheel
-    
-    # Install Python packages
-    python3 -m pip install --user \
-        Flask \
-        flask-cors \
-        numpy \
-        opencv-python-headless \
-        Pillow \
-        piexif \
-        psutil \
-        schedule \
-        RPi.GPIO
-    
-    # Install optional dependencies
-    python3 -m pip install --user \
-        pandas \
-        qrcode \
-        matplotlib
-    
-    # PiJuice support (optional, for Pi 4)
-    if lsusb | grep -q "PiJuice"; then
-        log "PiJuice detected. Installing PiJuice packages..."
-        sudo apt-get install -y \
-            pijuice-base \
-            pijuice-gui
+    # Ensure Python3 venv is available
+    if ! dpkg -l | grep -q python3-venv; then
+        log "Installing python3-venv..."
+        sudo apt-get update
+        sudo apt-get install -y python3-venv
     fi
     
-    log "Package installation complete."
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "$VENV_PATH" ]; then
+        log "Creating virtual environment at $VENV_PATH..."
+        python3 -m venv "$VENV_PATH"
+    else
+        log "Virtual environment already exists at $VENV_PATH"
+    fi
+    
+    # Activate virtual environment
+    log "Activating virtual environment..."
+    source "$VENV_PATH/bin/activate"
+    
+    # Upgrade pip within the virtual environment
+    log "Upgrading pip, setuptools, and wheel..."
+    pip install --upgrade pip setuptools wheel
+    
+    log "Python virtual environment setup complete."
+}
+
+# Install Python dependencies
+install_python_deps() {
+    log "Installing Python dependencies..."
+    
+    # Make sure virtual environment is activated
+    if [[ "$VIRTUAL_ENV" != "$VENV_PATH" ]]; then
+        source "$VENV_PATH/bin/activate"
+    fi
+    
+    # Check if requirements.txt exists
+    if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+        log "Installing from requirements.txt..."
+        pip install -r "$SCRIPT_DIR/requirements.txt"
+    else
+        # Fallback to inline installation if requirements.txt isn't found
+        log "requirements.txt not found, installing packages directly..."
+        pip install \
+            Flask==2.1.0 \
+            flask-cors==3.0.10 \
+            numpy==1.22.0 \
+            opencv-python-headless==4.5.5.64 \
+            Pillow==9.0.0 \
+            piexif==1.1.3 \
+            psutil==5.9.0 \
+            RPi.GPIO==0.7.0 \
+            schedule==1.1.0 \
+            python-crontab==2.6.0
+    fi
+    
+    # Check if PiJuice is present and install the module if needed
+    if lsusb | grep -q "PiJuice"; then
+        log "PiJuice detected, installing PiJuice Python module..."
+        pip install pijuice.py
+    fi
+    
+    log "Python dependencies installed successfully."
 }
 
 # Create directory structure
@@ -163,7 +204,7 @@ create_directories() {
     log "Directory structure created."
 }
 
-# Copy files (similar to previous script)
+# Copy files
 copy_files() {
     log "Copying files to installation directory..."
     
@@ -173,7 +214,7 @@ copy_files() {
         exit 1
     fi
     
-    # Copy files (same as previous script)
+    # Copy files
     cp -r "$SCRIPT_DIR/src/Software/"* "$TARGET_DIR/Software/"
     cp -r "$SCRIPT_DIR/src/config/"* "$TARGET_DIR/"
     cp "$SCRIPT_DIR/src/web/app.py" "$TARGET_DIR/web/"
@@ -237,9 +278,10 @@ After=network.target
 [Service]
 User=$USER
 WorkingDirectory=$TARGET_DIR/web
-ExecStart=$(which python3) $TARGET_DIR/web/app.py
+ExecStart=$VENV_PATH/bin/python $TARGET_DIR/web/app.py
 Restart=always
 RestartSec=5
+Environment="PATH=$VENV_PATH/bin:$PATH"
 
 [Install]
 WantedBy=multi-user.target
@@ -279,16 +321,54 @@ create_crontab_example() {
 # To install: crontab -e
 
 # Take photo every hour
-0 * * * * python3 ${TARGET_DIR}/TakePhoto.py
+0 * * * * $VENV_PATH/bin/python ${TARGET_DIR}/TakePhoto.py
 
 # Run scheduler at boot
-@reboot python3 ${TARGET_DIR}/Scheduler.py
+@reboot $VENV_PATH/bin/python ${TARGET_DIR}/Scheduler.py
 
 # Backup photos daily at 3 AM
-0 3 * * * python3 ${TARGET_DIR}/Software/Backup_Files.py
+0 3 * * * $VENV_PATH/bin/python ${TARGET_DIR}/Software/Backup_Files.py
 EOL
     
     log "Crontab example file created at $TARGET_DIR/crontab.example"
+}
+
+# Verify installation
+verify_installation() {
+    log "Verifying installation..."
+    
+    # Check if critical files exist
+    local missing_files=0
+    for file in "$TARGET_DIR/TakePhoto.py" "$TARGET_DIR/Scheduler.py" "$TARGET_DIR/web/app.py"; do
+        if [ ! -f "$file" ]; then
+            error "Missing critical file: $file"
+            missing_files=$((missing_files + 1))
+        fi
+    done
+    
+    # Check if web service is running
+    if ! systemctl is-active --quiet creaturebox-web.service; then
+        error "Web service is not running. Check logs with: sudo journalctl -u creaturebox-web.service"
+        missing_files=$((missing_files + 1))
+    fi
+    
+    # Check Python dependencies in virtual environment
+    local missing_deps=0
+    for dep in flask numpy opencv-python-headless pillow; do
+        if ! $VENV_PATH/bin/pip list | grep -i "$dep" > /dev/null; then
+            error "Missing Python dependency: $dep"
+            missing_deps=$((missing_deps + 1))
+        fi
+    done
+    
+    if [ $missing_files -eq 0 ] && [ $missing_deps -eq 0 ]; then
+        log "Installation verification successful!"
+        return 0
+    else
+        error "Installation verification failed with $missing_files missing files and $missing_deps missing dependencies."
+        error "Please check the log file at $LOG_FILE for details."
+        return 1
+    fi
 }
 
 # Main installation function
@@ -298,9 +378,18 @@ main() {
     # System checks and setup
     check_system
     install_packages
-    create_directories
     
-    # File operations
+    # Python environment setup
+    setup_venv
+    
+    # Trap to deactivate virtual environment on script exit
+    trap 'deactivate' EXIT
+    
+    # Python dependencies
+    install_python_deps
+    
+    # Directory structure and files
+    create_directories
     copy_files
     set_permissions
     create_symlinks
@@ -308,6 +397,9 @@ main() {
     # Service setup
     setup_web_service
     create_crontab_example
+    
+    # Verify installation
+    verify_installation
     
     # Installation complete
     log "CreatureBox installation complete!"
