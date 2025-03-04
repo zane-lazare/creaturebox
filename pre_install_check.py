@@ -74,32 +74,7 @@ def check_raspberry_pi():
         print(f"{YELLOW}! Could not determine if this is a Raspberry Pi: {e}{NC}")
         return False
 
-def check_camera():
-    """Check if a camera is available."""
-    print("Checking camera availability...")
-    
-    # Check if the camera module is enabled
-    try:
-        result = subprocess.run(['vcgencmd', 'get_camera'], 
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-                               text=True, check=False)
-        
-        if 'detected=1' in result.stdout:
-            print(f"{GREEN}✓ Camera module is detected and enabled.{NC}")
-            return True
-        else:
-            print(f"{YELLOW}! Camera module is not detected or not enabled.{NC}")
-            print(f"{YELLOW}  You may need to enable it using 'sudo raspi-config'.{NC}")
-            return False
-    except:
-        # Try an alternative approach
-        if os.path.exists('/dev/video0'):
-            print(f"{GREEN}✓ Camera device /dev/video0 is available.{NC}")
-            return True
-        else:
-            print(f"{YELLOW}! No camera device found.{NC}")
-            print(f"{YELLOW}  Make sure your camera is connected and enabled.{NC}")
-            return False
+
 
 def check_disk_space():
     """Check if there's enough disk space."""
@@ -121,7 +96,42 @@ def check_disk_space():
     except Exception as e:
         print(f"{YELLOW}! Could not check disk space: {e}{NC}")
         return False
-
+        
+def check_camera():
+    """Check if a camera is available."""
+    print("Checking camera availability...")    
+    # Try using libcamera-hello --list-cameras (more reliable with picamera2)
+    try:
+        result = subprocess.run(['libcamera-hello', '--list-cameras'], 
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                               text=True, check=False)        
+        if "Available cameras" in result.stdout and not "No cameras available" in result.stdout:
+            print(f"{GREEN}✓ Camera detected using libcamera-hello.{NC}")
+            return True
+    except Exception as e:
+        pass    
+    # Original detection methods
+    try:
+        result = subprocess.run(['vcgencmd', 'get_camera'], 
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                               text=True, check=False)        
+        if 'detected=1' in result.stdout:
+            print(f"{GREEN}✓ Camera module is detected and enabled.{NC}")
+            return True
+        else:
+            print(f"{YELLOW}! Camera module is not detected or not enabled.{NC}")
+            print(f"{YELLOW}  You may need to enable it using 'sudo raspi-config'.{NC}")
+    except:
+        pass        
+    # Try an alternative approach
+    if os.path.exists('/dev/video0'):
+        print(f"{GREEN}✓ Camera device /dev/video0 is available.{NC}")
+        return True
+    else:
+        print(f"{YELLOW}! No camera device found.{NC}")
+        print(f"{YELLOW}  Make sure your camera is connected and enabled.{NC}")
+        return False
+        
 def check_required_commands():
     """Check if required commands are available."""
     print("Checking required commands...")
