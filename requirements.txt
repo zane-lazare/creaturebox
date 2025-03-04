@@ -9,3 +9,4 @@ psutil==5.9.0
 RPi.GPIO; platform_machine == 'aarch64'
 schedule==1.1.0
 python-crontab==2.6.0
+requests==2.28.1
