@@ -43,12 +43,34 @@ error() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" >> "$LOG_FILE"
 }
 
+# Detect Raspberry Pi model
+detect_pi_model() {
+    log "Detecting Raspberry Pi model..."
+    PI_MODEL="unknown"
+    
+    if grep -q "Raspberry Pi 5" /proc/cpuinfo; then
+        PI_MODEL="5"
+        log "Detected Raspberry Pi 5"
+    elif grep -q "Raspberry Pi 4" /proc/cpuinfo; then
+        PI_MODEL="4"
+        log "Detected Raspberry Pi 4"
+    elif grep -q "Raspberry Pi" /proc/cpuinfo; then
+        PI_MODEL="other"
+        log "Detected Raspberry Pi (older model)"
+    else
+        log "Could not detect Raspberry Pi model"
+    fi
+    
+    # Export for use in other functions
+    export PI_MODEL
+}
+
 # Check system requirements
 check_system() {
     log "Checking system requirements..."
     
     # Check if running on Raspberry Pi
-    if ! grep -q "Raspberry Pi" /proc/cpuinfo && ! grep -q "BCM" /proc/cpuinfo; then
+    if ! grep -q "Raspberry Pi\|BCM" /proc/cpuinfo; then
         error "This script is designed to run on a Raspberry Pi."
         error "If you are running on a Pi but seeing this message, you can continue anyway."
         read -p "Continue installation? (y/n) " -n 1 -r
@@ -57,6 +79,9 @@ check_system() {
             exit 1
         fi
     fi
+    
+    # Detect Pi model
+    detect_pi_model
     
     # Check Python version
     python_version=$(python3 --version 2>&1 | cut -d ' ' -f 2)
@@ -97,12 +122,14 @@ install_packages() {
         python3-pip \
         python3-venv
     
-    # Install camera dependencies
+    # Install camera dependencies with extra packages for Pi 5
     sudo apt-get install -y \
         libcamera-dev \
         libcamera-apps \
         python3-libcamera \
-        python3-picamera2
+        python3-picamera2 \
+        libcap-dev \
+        v4l-utils
     
     # Install networking and wireless tools
     sudo apt-get install -y \
@@ -175,7 +202,16 @@ install_python_deps() {
             RPi.GPIO==0.7.0 \
             schedule==1.1.0 \
             python-crontab==2.6.0
+        
+        # Install picamera2 for Pi 5
+        if [ "$PI_MODEL" = "5" ]; then
+            log "Installing picamera2 for Raspberry Pi 5..."
+            pip install picamera2
+        fi
     fi
+    
+    # Create a file to indicate which Pi model was used for installation
+    echo "PI_MODEL=$PI_MODEL" > "$TARGET_DIR/pi_model.txt"
     
     # Check if PiJuice is present and install the module if needed
     if lsusb | grep -q "PiJuice"; then
@@ -299,6 +335,22 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
     }
 
+    # Special configuration for camera streaming
+    location /api/camera/stream {
+        proxy_pass http://127.0.0.1:$WEB_PORT;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        
+        # Disable buffering for streaming content
+        proxy_buffering off;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        
+        # Increased timeouts for streaming
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
+    }
+
     client_max_body_size 100M;
 }
 EOL
@@ -360,6 +412,14 @@ verify_installation() {
             missing_deps=$((missing_deps + 1))
         fi
     done
+    
+    # Check for Pi 5 specific dependencies
+    if [ "$PI_MODEL" = "5" ]; then
+        if ! $VENV_PATH/bin/pip list | grep -i "picamera2" > /dev/null; then
+            error "Missing Python dependency for Pi 5: picamera2"
+            missing_deps=$((missing_deps + 1))
+        fi
+    fi
     
     if [ $missing_files -eq 0 ] && [ $missing_deps -eq 0 ]; then
         log "Installation verification successful!"
