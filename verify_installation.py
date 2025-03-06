@@ -248,40 +248,66 @@ def check_web_interface():
     return False
 
 def check_camera():
-    """Check if the camera is accessible."""
+    """Check if the camera is accessible using modern detection methods."""
     logger.info("Checking camera accessibility...")
     
-    # Check if the camera module is loaded
-    try:
-        result = subprocess.run(['vcgencmd', 'get_camera'], 
-                               stdout=subprocess.PIPE, text=True, check=False)
-        if 'detected=1' in result.stdout:
-            logger.info("Camera module is detected")
-        else:
-            logger.warning("Camera module is not detected")
-            return False
-    except (subprocess.SubprocessError, FileNotFoundError):
-        logger.warning("Could not check camera module status")
+    # Method 1: Check for video devices
+    camera_detected = False
+    if os.path.exists('/dev/video0'):
+        logger.info("Camera device /dev/video0 found")
+        camera_detected = True
     
-    # Try to take a test photo
-    test_photo_path = os.path.join(CREATUREBOX_DIR, 'test_photo.jpg')
-    try:
-        # Use libcamera-still to take a photo
-        result = subprocess.run(['libcamera-still', '-o', test_photo_path, '-n', '--immediate'], 
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-                               text=True, check=False, timeout=10)
-        
-        if result.returncode == 0 and os.path.exists(test_photo_path):
-            logger.info("Successfully took a test photo")
-            # Clean up test photo
-            os.remove(test_photo_path)
-            return True
-        else:
-            logger.error(f"Failed to take a test photo: {result.stderr}")
+    # Method 2: Try libcamera-hello if available
+    if not camera_detected:
+        try:
+            result = subprocess.run(['libcamera-hello', '--list-cameras'], 
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                                   text=True, check=False, timeout=5)
+            
+            if "Available cameras" in result.stdout and not "No cameras available" in result.stdout:
+                logger.info("Camera detected via libcamera-hello")
+                camera_detected = True
+        except (subprocess.SubprocessError, FileNotFoundError, TimeoutError):
+            logger.warning("Could not check camera using libcamera-hello")
+    
+    # Method 3: Try the traditional vcgencmd method (might not work on newer systems)
+    if not camera_detected:
+        try:
+            result = subprocess.run(['vcgencmd', 'get_camera'], 
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                                   text=True, check=False, timeout=3)
+            
+            if 'detected=1' in result.stdout:
+                logger.info("Camera detected via vcgencmd")
+                camera_detected = True
+            else:
+                logger.warning("Camera not detected via vcgencmd")
+        except (subprocess.SubprocessError, FileNotFoundError, TimeoutError):
+            logger.warning("vcgencmd not available or not working on this system")
+    
+    # If a camera was detected by any method, try to take a test photo
+    if camera_detected:
+        test_photo_path = os.path.join(CREATUREBOX_DIR, 'test_photo.jpg')
+        try:
+            # Use libcamera-still to take a photo with extended timeout
+            result = subprocess.run(['libcamera-still', '-o', test_photo_path, '-n', '--immediate'], 
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                                  text=True, check=False, timeout=15)
+            
+            if result.returncode == 0 and os.path.exists(test_photo_path):
+                logger.info("Successfully took a test photo")
+                # Clean up test photo
+                os.remove(test_photo_path)
+                return True
+            else:
+                logger.error(f"Failed to take a test photo: {result.stderr}")
+                return False
+        except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+            logger.error(f"Error while testing camera: {e}")
             return False
-    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        logger.error(f"Error while testing camera: {e}")
-        return False
+    
+    logger.error("No camera detected by any method")
+    return False
 
 def run_verification():
     """Run all verification checks and return overall status."""
@@ -410,4 +436,3 @@ if __name__ == "__main__":
         print(f"An unexpected error occurred: {e}")
         print("Please check the log file for details.")
         sys.exit(1)
-'
