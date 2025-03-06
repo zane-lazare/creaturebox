@@ -29,6 +29,14 @@ except ImportError:
     CV2_AVAILABLE = False
     print("OpenCV not available. Camera streaming will be disabled.")
 
+# Try to import picamera2 for Pi 5 support
+try:
+    from picamera2 import Picamera2
+    PICAMERA2_AVAILABLE = True
+except ImportError:
+    PICAMERA2_AVAILABLE = False
+    print("picamera2 not available. Pi 5 camera support will be disabled.")
+
 try:
     import psutil
     PSUTIL_AVAILABLE = True
@@ -66,7 +74,25 @@ os.makedirs(PHOTOS_DIR, exist_ok=True)
 
 # Global variables
 camera = None
-camera_lock = threading.Lock() if CV2_AVAILABLE else None
+picam2 = None
+camera_lock = threading.Lock() if CV2_AVAILABLE or PICAMERA2_AVAILABLE else None
+is_pi5 = False
+
+# Detect Raspberry Pi model
+def detect_pi_model():
+    """Determine if we're running on a Pi 5"""
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            cpuinfo = f.read()
+            if 'Pi 5' in cpuinfo:
+                return True
+    except Exception as e:
+        logger.error(f"Error detecting Pi model: {str(e)}")
+    return False
+
+# Set Pi model detection
+is_pi5 = detect_pi_model()
+logger.info(f"Detected Raspberry Pi 5: {is_pi5}")
 
 # Utility functions
 def read_csv_settings(file_path):
@@ -545,52 +571,75 @@ def get_log_content(log_type):
 
 def init_camera():
     """Initialize the camera."""
-    global camera
-    if not CV2_AVAILABLE:
-        return False
+    global camera, picam2
     
     try:
         with camera_lock:
-            if camera is not None:
-                camera.release()
+            # Clean up any existing camera instances
+            release_camera()
             
-            camera = cv2.VideoCapture(0)
-            camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            
-            if not camera.isOpened():
-                logger.error("Failed to open camera")
-                camera = None
+            # For Pi 5, use picamera2
+            if is_pi5 and PICAMERA2_AVAILABLE:
+                logger.info("Initializing camera using picamera2 for Pi 5")
+                picam2 = Picamera2()
+                config = picam2.create_preview_configuration(main={"size": (640, 480)})
+                picam2.configure(config)
+                picam2.start()
+                return True
+            # For other systems, use OpenCV if available
+            elif CV2_AVAILABLE:
+                logger.info("Initializing camera using OpenCV")
+                camera = cv2.VideoCapture(0)
+                camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                
+                if not camera.isOpened():
+                    logger.error("Failed to open camera with OpenCV")
+                    camera = None
+                    return False
+                
+                return True
+            else:
+                logger.error("No camera interface available")
                 return False
-            
-            return True
     except Exception as e:
         logger.error(f"Error initializing camera: {str(e)}")
-        camera = None
+        release_camera()
         return False
 
 def release_camera():
     """Release the camera."""
-    global camera
-    if not CV2_AVAILABLE:
-        return
+    global camera, picam2
     
     try:
         with camera_lock:
+            if picam2 is not None:
+                try:
+                    picam2.stop()
+                    picam2.close()
+                except:
+                    pass
+                finally:
+                    picam2 = None
+                    
             if camera is not None:
-                camera.release()
-                camera = None
+                try:
+                    camera.release()
+                except:
+                    pass
+                finally:
+                    camera = None
     except Exception as e:
         logger.error(f"Error releasing camera: {str(e)}")
 
 def generate_camera_frames():
     """Generate camera frames for streaming."""
-    global camera
+    global camera, picam2
     
-    if not CV2_AVAILABLE:
+    if not PICAMERA2_AVAILABLE and not CV2_AVAILABLE:
         yield (b'--frame\r\n'
                b'Content-Type: text/plain\r\n\r\n'
-               b'Camera not available - OpenCV not installed\r\n')
+               b'Camera not available - Required libraries not installed\r\n')
         return
     
     if not init_camera():
@@ -600,25 +649,56 @@ def generate_camera_frames():
         return
     
     try:
-        while True:
-            with camera_lock:
-                if camera is None:
-                    break
-                
-                success, frame = camera.read()
-                if not success:
-                    break
-                
-                # Encode frame as JPEG
-                _, buffer = cv2.imencode('.jpg', frame)
-                frame_bytes = buffer.tobytes()
-                
-                # Yield frame in MJPEG format
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-                
-                # Add a small delay to control frame rate
-                time.sleep(0.1)
+        # Using picamera2 for Pi 5
+        if is_pi5 and picam2 is not None:
+            while True:
+                try:
+                    with camera_lock:
+                        if picam2 is None:
+                            break
+                        
+                        # Capture frame from picamera2
+                        frame = picam2.capture_array()
+                        
+                        # Convert from BGR to RGB if needed
+                        if frame.shape[2] == 3:  # Check if it's a color image
+                            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        
+                        # Encode frame as JPEG
+                        _, buffer = cv2.imencode('.jpg', frame)
+                        frame_bytes = buffer.tobytes()
+                        
+                        # Yield frame in MJPEG format
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                        
+                        # Add a small delay to control frame rate
+                        time.sleep(0.1)
+                except Exception as e:
+                    logger.error(f"Error capturing frame with picamera2: {str(e)}")
+                    time.sleep(1)  # Wait a bit before retrying
+        
+        # Using OpenCV for other systems
+        elif camera is not None:
+            while True:
+                with camera_lock:
+                    if camera is None:
+                        break
+                    
+                    success, frame = camera.read()
+                    if not success:
+                        break
+                    
+                    # Encode frame as JPEG
+                    _, buffer = cv2.imencode('.jpg', frame)
+                    frame_bytes = buffer.tobytes()
+                    
+                    # Yield frame in MJPEG format
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                    
+                    # Add a small delay to control frame rate
+                    time.sleep(0.1)
     except Exception as e:
         logger.error(f"Error generating camera frames: {str(e)}")
     finally:
@@ -753,270 +833,3 @@ def network_status():
             'ip': ip,
             'signalStrength': signal_strength
         })
-    except Exception as e:
-        logger.error(f"Error getting network status: {str(e)}")
-        return jsonify({
-            'connected': False,
-            'ssid': None,
-            'ip': 'Not available',
-            'signalStrength': 0
-        })
-
-@app.route('/api/network/add', methods=['POST'])
-def add_network():
-    """Add a new WiFi network."""
-    data = request.get_json()
-    
-    if 'ssid' not in data or 'wifipass' not in data:
-        return jsonify({'status': 'error', 'message': 'SSID and password required'}), 400
-    
-    # Update schedule settings file with new WiFi credentials
-    settings = {
-        'ssid': data['ssid'],
-        'wifipass': data['wifipass']
-    }
-    
-    success = write_csv_settings(SCHEDULE_SETTINGS_FILE, settings)
-    
-    if success:
-        # Run RegisterNewWifi.sh script
-        subprocess.Popen(['sudo', os.path.join(SCRIPTS_DIR, 'RegisterNewWifi.sh')])
-        return jsonify({'status': 'success'})
-    else:
-        return jsonify({'status': 'error', 'message': 'Failed to add network'}), 500
-
-@app.route('/api/gallery/dates')
-def gallery_dates():
-    """Get list of dates with photos."""
-    dates = get_photo_dates()
-    return jsonify(dates)
-
-@app.route('/api/gallery/photos')
-def gallery_photos():
-    """Get list of photos."""
-    date = request.args.get('date')
-    photos = get_photos(date)
-    return jsonify(photos)
-
-@app.route('/api/gallery/photos/view/<date>/<filename>')
-def view_photo(date, filename):
-    """View a photo."""
-    file_path = get_photo_file(date, filename)
-    
-    if file_path:
-        download = request.args.get('download', '0') == '1'
-        if download:
-            return send_file(file_path, as_attachment=True)
-        else:
-            return send_file(file_path)
-    else:
-        return 'Photo not found', 404
-
-@app.route('/api/gallery/photos/thumbnail/<date>/<filename>')
-def view_thumbnail(date, filename):
-    """View a photo thumbnail."""
-    file_path = get_photo_file(date, filename)
-    
-    if file_path:
-        thumbnail = generate_thumbnail(file_path)
-        if thumbnail is not None:
-            return Response(thumbnail.tobytes(), mimetype='image/jpeg')
-    
-    return 'Thumbnail not available', 404
-
-@app.route('/api/gallery/photos/<filename>', methods=['DELETE'])
-def delete_photo(filename):
-    """Delete a photo."""
-    try:
-        # Find the photo in all date directories
-        for root, dirs, files in os.walk(PHOTOS_DIR):
-            if filename in files:
-                file_path = os.path.join(root, filename)
-                os.remove(file_path)
-                return jsonify({'status': 'success'})
-        
-        return jsonify({'status': 'error', 'message': 'Photo not found'}), 404
-    except Exception as e:
-        logger.error(f"Error deleting photo: {str(e)}")
-        return jsonify({'status': 'error', 'message': f'Error deleting photo: {str(e)}'}), 500
-
-@app.route('/api/logs/<log_type>')
-def logs(log_type):
-    """Get log content."""
-    content = get_log_content(log_type)
-    return jsonify({'content': content})
-
-@app.route('/api/logs/<log_type>/download')
-def download_log(log_type):
-    """Download log file."""
-    content = get_log_content(log_type)
-    
-    # Create in-memory file
-    buffer = io.BytesIO()
-    buffer.write(content.encode('utf-8'))
-    buffer.seek(0)
-    
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=f'creaturebox_{log_type}_log.txt',
-        mimetype='text/plain'
-    )
-
-@app.route('/api/system/toggle-lights', methods=['POST'])
-def toggle_lights():
-    """Toggle attraction lights."""
-    try:
-        # Check current state by reading control file
-        control_values = read_control_values(CONTROLS_FILE)
-        current_state = control_values.get('lights_on', 'false').lower() == 'true'
-        
-        # Toggle state
-        new_state = not current_state
-        
-        # Run appropriate script
-        if new_state:
-            success, _ = run_script('Attract_On.py')
-        else:
-            success, _ = run_script('Attract_Off.py')
-        
-        # Update control file
-        write_control_values(CONTROLS_FILE, {'lights_on': str(new_state).lower()})
-        
-        return jsonify({'status': 'success', 'lightsOn': new_state})
-    except Exception as e:
-        logger.error(f"Error toggling lights: {str(e)}")
-        return jsonify({'status': 'error', 'message': f'Error toggling lights: {str(e)}'}), 500
-
-@app.route('/api/system/reboot', methods=['POST'])
-def reboot_system():
-    """Reboot the system."""
-    try:
-        # Run reboot command in background
-        subprocess.Popen(['sudo', 'reboot'])
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        logger.error(f"Error rebooting system: {str(e)}")
-        return jsonify({'status': 'error', 'message': f'Error rebooting system: {str(e)}'}), 500
-
-@app.route('/api/system/shutdown', methods=['POST'])
-def shutdown_system():
-    """Shut down the system."""
-    try:
-        # Run shutdown command in background
-        subprocess.Popen(['sudo', 'shutdown', '-h', 'now'])
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        logger.error(f"Error shutting down system: {str(e)}")
-        return jsonify({'status': 'error', 'message': f'Error shutting down system: {str(e)}'}), 500
-
-@app.route('/api/system/power', methods=['GET'])
-def get_power_settings():
-    """Get power settings."""
-    try:
-        # Determine Raspberry Pi model
-        pi_model = None
-        with open('/proc/cpuinfo', 'r') as f:
-            for line in f:
-                if line.startswith('Model'):
-                    if 'Pi 4' in line:
-                        pi_model = '4'
-                    elif 'Pi 5' in line:
-                        pi_model = '5'
-                    break
-        
-        # Read EEPROM settings for Pi 5
-        eeprom_settings = {}
-        power_manager = 'Unknown'
-        
-        if pi_model == '5':
-            try:
-                # Run rpi-eeprom-config command
-                result = subprocess.run(['sudo', 'rpi-eeprom-config'], capture_output=True, text=True)
-                
-                for line in result.stdout.split('\n'):
-                    if '=' in line:
-                        key, value = line.split('=', 1)
-                        eeprom_settings[key] = value
-                
-                power_manager = 'Raspberry Pi EEPROM'
-            except:
-                pass
-        elif pi_model == '4':
-            try:
-                from pijuice import PiJuice
-                pj = PiJuice(1, 0x14)
-                status = pj.status.GetStatus()
-                if status['error'] == 'NO_ERROR':
-                    power_manager = 'PiJuice'
-            except:
-                power_manager = 'Unknown'
-        
-        return jsonify({
-            'piModel': pi_model,
-            'powerManager': power_manager,
-            'POWER_OFF_ON_HALT': eeprom_settings.get('POWER_OFF_ON_HALT', '0'),
-            'WAKE_ON_GPIO': eeprom_settings.get('WAKE_ON_GPIO', '0')
-        })
-    except Exception as e:
-        logger.error(f"Error getting power settings: {str(e)}")
-        return jsonify({
-            'piModel': 'Unknown',
-            'powerManager': 'Unknown',
-            'POWER_OFF_ON_HALT': '0',
-            'WAKE_ON_GPIO': '0'
-        })
-
-@app.route('/api/system/power', methods=['POST'])
-def update_power_settings():
-    """Update power settings."""
-    try:
-        data = request.get_json()
-        
-        # Determine Raspberry Pi model
-        pi_model = None
-        with open('/proc/cpuinfo', 'r') as f:
-            for line in f:
-                if line.startswith('Model'):
-                    if 'Pi 4' in line:
-                        pi_model = '4'
-                    elif 'Pi 5' in line:
-                        pi_model = '5'
-                    break
-        
-        # Only update EEPROM settings on Pi 5
-        if pi_model == '5':
-            settings = {}
-            
-            if 'POWER_OFF_ON_HALT' in data:
-                settings['POWER_OFF_ON_HALT'] = data['POWER_OFF_ON_HALT']
-            
-            if 'WAKE_ON_GPIO' in data:
-                settings['WAKE_ON_GPIO'] = data['WAKE_ON_GPIO']
-            
-            # Create temporary config file
-            with open('/tmp/eeprom_config.txt', 'w') as f:
-                for key, value in settings.items():
-                    f.write(f"{key}={value}\n")
-            
-            # Apply settings
-            subprocess.run(['sudo', 'rpi-eeprom-config', '--apply', '/tmp/eeprom_config.txt'], check=True)
-        
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        logger.error(f"Error updating power settings: {str(e)}")
-        return jsonify({'status': 'error', 'message': f'Error updating power settings: {str(e)}'}), 500
-
-# Main entry point
-if __name__ == '__main__':
-    try:
-        # Create required directories if they don't exist
-        os.makedirs(PHOTOS_DIR, exist_ok=True)
-        
-        # Start the server
-        app.run(host='0.0.0.0', port=5000, threaded=True)
-    except Exception as e:
-        logger.error(f"Error starting server: {str(e)}")
-    finally:
-        # Ensure camera is released
-        release_camera()
