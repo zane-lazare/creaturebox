@@ -248,7 +248,7 @@ def check_web_interface():
     return False
 
 def check_camera():
-    """Check if the camera is accessible using modern detection methods."""
+    """Check if the camera is accessible using multiple detection methods."""
     logger.info("Checking camera accessibility...")
     
     # Method 1: Check for video devices
