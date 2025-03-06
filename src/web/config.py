@@ -1,51 +1,47 @@
+# src/web/config.py
 import os
-import logging
-from pathlib import Path
 
-class Config:
-    """Base configuration class for CreatureBox web interface."""
-    
-    # Directories
-    BASE_DIR = Path(__file__).resolve().parent.parent
-    WEB_DIR = BASE_DIR / 'web'
-    STATIC_DIR = WEB_DIR / 'static'
-    PHOTOS_DIR = BASE_DIR / 'photos'
-    LOGS_DIR = BASE_DIR / 'logs'
-    
-    # Web Server Configuration
-    WEB_HOST = os.getenv('CREATUREBOX_HOST', '0.0.0.0')
-    WEB_PORT = int(os.getenv('CREATUREBOX_PORT', 5000))
-    
-    # Logging Configuration
-    LOGGING_LEVEL = os.getenv('CREATUREBOX_LOG_LEVEL', 'INFO')
-    LOGGING_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    
-    # Feature Flags
-    FEATURES = {
-        'camera_streaming': os.getenv('FEATURE_CAMERA_STREAM', 'true').lower() == 'true',
-        'photo_gallery': os.getenv('FEATURE_PHOTO_GALLERY', 'true').lower() == 'true',
-        'network_settings': os.getenv('FEATURE_NETWORK_SETTINGS', 'true').lower() == 'true'
-    }
-    
-    # Storage Configurations
-    MAX_PHOTO_STORAGE_GB = int(os.getenv('MAX_PHOTO_STORAGE', 16))
-    BACKUP_STORAGE_THRESHOLD_GB = int(os.getenv('BACKUP_STORAGE_THRESHOLD', 4))
-    
-    # Security Settings
-    SECRET_KEY = os.getenv('CREATUREBOX_SECRET_KEY', 'development_secret_key')
-    
-    @classmethod
-    def configure_logging(cls):
-        """Configure logging based on configuration."""
-        logging.basicConfig(
-            level=getattr(logging, cls.LOGGING_LEVEL.upper()),
-            format=cls.LOGGING_FORMAT,
-            handlers=[
-                logging.FileHandler(cls.LOGS_DIR / 'creaturebox_web.log'),
-                logging.StreamHandler()
-            ]
-        )
-        return logging.getLogger('creaturebox')
+# Base Paths
+HOME_DIR = os.path.expanduser("~")
+BASE_DIR = os.path.join(HOME_DIR, "CreatureBox")
+PHOTOS_DIR = os.path.join(BASE_DIR, "photos")
+PHOTOS_BACKUP_DIR = os.path.join(BASE_DIR, "photos_backedup")
+SCRIPTS_DIR = os.path.join(BASE_DIR, "Software")
+CONFIG_DIR = BASE_DIR
+LOG_DIR = os.path.join(BASE_DIR, "logs")
 
-# Instantiate logger
-logger = Config.configure_logging()
+# File Paths
+CAMERA_SETTINGS_FILE = os.path.join(CONFIG_DIR, "camera_settings.csv")
+SCHEDULE_SETTINGS_FILE = os.path.join(CONFIG_DIR, "schedule_settings.csv")
+CONTROLS_FILE = os.path.join(CONFIG_DIR, "controls.txt")
+
+# Web Server Settings
+PORT = 5000
+HOST = '0.0.0.0'
+DEBUG = False
+THREADED = True
+
+# Feature Flags
+ENABLE_CAMERA_STREAM = True
+ENABLE_BACKGROUND_JOBS = True
+ENABLE_RATE_LIMITING = False  # For future implementation
+
+# Performance Settings
+PHOTO_PROCESSING_THREADS = 2
+CACHE_TIMEOUT = 300  # seconds
+MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
+
+# Thumbnail Settings
+THUMBNAIL_SIZE = (200, 200)
+THUMBNAIL_QUALITY = 85
+
+# Camera Settings
+CAMERA_LOCK_TIMEOUT = 30  # seconds
+
+# Logging Configuration
+LOG_LEVEL = "INFO"
+LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+LOG_FILE = os.path.join(LOG_DIR, 'creaturebox_web.log')
+
+# API Settings
+API_RATE_LIMIT = 60  # requests per minute
